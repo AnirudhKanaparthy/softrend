@@ -15,6 +15,9 @@
 #define RAD(degrees) ((degrees)*(CONST_PI/180.0f))
 #define DEG(radians) ((radians)*(180.0f/CONST_PI))
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 typedef struct {
     unsigned char r;
     unsigned char g;
@@ -81,8 +84,13 @@ bool render_tri(RGBA *image, float* zbuf, int width, int height,
     float za, float zb, float zc,
     RGBA color
 ) {
-    for (int j = 0; j < height; ++j) {
-        for (int i = 0; i < width; ++i) {
+    int min_x = MIN(a.x, MIN(b.x, c.x));
+    int max_x = MAX(a.x, MAX(b.x, c.x));
+    int min_y = MIN(a.y, MIN(b.y, c.y));
+    int max_y = MAX(a.y, MAX(b.y, c.y));
+
+    for (int j = min_y; j <= max_y; ++j) {
+        for (int i = min_x; i <= max_x; ++i) {
             Vec3f uvw;
             if (!baryi(a, b, c, (Vec2i){i, j}, &uvw))
                 continue;
@@ -367,8 +375,6 @@ int main() {
     clock_t prev_time = clock();
     while (RGFW_window_shouldClose(win) == RGFW_FALSE) {
         RGFW_pollEvents();
-
-        render_clear(image, width, height, background);
 
         // Rotate
         Mat4f rotate = mat4f_rotate((Vec3f){.x=RAD(del), .y=RAD(del), .z=RAD(del)});
