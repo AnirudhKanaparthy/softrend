@@ -84,10 +84,10 @@ bool render_tri(RGBA *image, float* zbuf, int width, int height,
     float za, float zb, float zc,
     RGBA color
 ) {
-    int min_x = MIN(a.x, MIN(b.x, c.x));
-    int max_x = MAX(a.x, MAX(b.x, c.x));
-    int min_y = MIN(a.y, MIN(b.y, c.y));
-    int max_y = MAX(a.y, MAX(b.y, c.y));
+    int min_x = MAX(0,       MIN(a.x, MIN(b.x, c.x)));
+    int max_x = MIN(width-1, MAX(a.x, MAX(b.x, c.x)));
+    int min_y = MAX(0,       MIN(a.y, MIN(b.y, c.y)));
+    int max_y = MIN(height-1,MAX(a.y, MAX(b.y, c.y)));
 
     for (int j = min_y; j <= max_y; ++j) {
         for (int i = min_x; i <= max_x; ++i) {
@@ -264,18 +264,18 @@ inline Vec4f vec4f_vec3f(Vec3f v, float w) {
 }
 
 inline Vec2i norm_to_screen(int width, int height, Vec2f xy) {
-    float cx = (xy.x + 1.0f) / 2.0f;
-    float cy = (xy.y + 1.0f) / 2.0f;
+    float cx = (xy.x + 1.0f) * 0.5f;
+    float cy = (xy.y + 1.0f) * 0.5f;
     return (Vec2i){
         .x=width*cx,
         .y=height*(1.0f-cy),
     };
 }
 
-inline Vec2f project(Vec3f v) {
+inline Vec2f project(Vec3f v, float aspect) {
     float z = v.z;
     return (Vec2f){
-        .x=v.x/z,
+        .x=v.x/z / aspect,
         .y=v.y/z,
     };
 }
@@ -289,6 +289,7 @@ void rgfw_keyfunc(const RGFW_event* event) {
 int main() {
     int width = 1024;
     int height = 1024;
+    float aspect = (float)width / height;
     int target_fps = 120;
 
     RGBA background = (RGBA){24, 2, 12, 255};
@@ -302,48 +303,48 @@ int main() {
         (Vec3f){-0.5f,  0.5f,  0.5f},
         (Vec3f){ 0.5f, -0.5f,  0.5f},
         (Vec3f){ 0.5f,  0.5f,  0.5f},
-        (Vec3f){-0.5f,  0.5f,  0.5f},
         (Vec3f){ 0.5f, -0.5f,  0.5f},
+        (Vec3f){-0.5f,  0.5f,  0.5f},
 
         // Back (z = -0.5)
         (Vec3f){ 0.5f, -0.5f, -0.5f},
         (Vec3f){ 0.5f,  0.5f, -0.5f},
         (Vec3f){-0.5f, -0.5f, -0.5f},
         (Vec3f){-0.5f,  0.5f, -0.5f},
-        (Vec3f){ 0.5f,  0.5f, -0.5f},
         (Vec3f){-0.5f, -0.5f, -0.5f},
+        (Vec3f){ 0.5f,  0.5f, -0.5f},
 
         // Left (x = -0.5)
         (Vec3f){-0.5f, -0.5f, -0.5f},
         (Vec3f){-0.5f,  0.5f, -0.5f},
         (Vec3f){-0.5f, -0.5f,  0.5f},
         (Vec3f){-0.5f,  0.5f,  0.5f},
-        (Vec3f){-0.5f,  0.5f, -0.5f},
         (Vec3f){-0.5f, -0.5f,  0.5f},
+        (Vec3f){-0.5f,  0.5f, -0.5f},
 
         // Right (x = +0.5)
         (Vec3f){ 0.5f, -0.5f,  0.5f},
         (Vec3f){ 0.5f,  0.5f,  0.5f},
         (Vec3f){ 0.5f, -0.5f, -0.5f},
         (Vec3f){ 0.5f,  0.5f, -0.5f},
-        (Vec3f){ 0.5f,  0.5f,  0.5f},
         (Vec3f){ 0.5f, -0.5f, -0.5f},
+        (Vec3f){ 0.5f,  0.5f,  0.5f},
 
         // Top (y = +0.5)
         (Vec3f){-0.5f,  0.5f,  0.5f},
         (Vec3f){-0.5f,  0.5f, -0.5f},
         (Vec3f){ 0.5f,  0.5f,  0.5f},
         (Vec3f){ 0.5f,  0.5f, -0.5f},
-        (Vec3f){-0.5f,  0.5f, -0.5f},
         (Vec3f){ 0.5f,  0.5f,  0.5f},
+        (Vec3f){-0.5f,  0.5f, -0.5f},
 
         // Bottom (y = -0.5)
         (Vec3f){-0.5f, -0.5f, -0.5f},
         (Vec3f){-0.5f, -0.5f,  0.5f},
         (Vec3f){ 0.5f, -0.5f, -0.5f},
         (Vec3f){ 0.5f, -0.5f,  0.5f},
-        (Vec3f){-0.5f, -0.5f,  0.5f},
         (Vec3f){ 0.5f, -0.5f, -0.5f},
+        (Vec3f){-0.5f, -0.5f,  0.5f},
     };
 
     RGBA colors[] = {
@@ -373,27 +374,24 @@ int main() {
     Vec2i screen_vertices[ARRAY_LEN(vertices)];
     
     clock_t prev_time = clock();
+    double delta_time = 0.0;
     while (RGFW_window_shouldClose(win) == RGFW_FALSE) {
         RGFW_pollEvents();
 
         // Rotate
         Mat4f rotate = mat4f_rotate((Vec3f){.x=RAD(del), .y=RAD(del), .z=RAD(del)});
+        Mat4f translate = mat4f_translate((Vec3f){.x=0.0f, .y=0.0f, .z=-3.0f});
         del += 1.0f;
-        for(int i = 0; i < ARRAY_LEN(vertices); ++i) {
-            Vec4f vec = vec4f_vec3f(vertices[i], 1.0f);
-            rotated_vertices[i] = mat4f_mulv(rotate, vec).xyz;
+
+        Mat4f model = mat4f_mulm(translate, rotate);
+        for (int i = 0; i < ARRAY_LEN(vertices); ++i) {
+            Vec4f v = mat4f_mulv(model, vec4f_vec3f(vertices[i], 1.0f));
+            translated_vertices[i] = v.xyz;
         }
 
-        // Translate
-        Mat4f translate = mat4f_translate((Vec3f){.x=0.0f, .y=0.0f, .z=-3.0f});
-        for(int i = 0; i < ARRAY_LEN(vertices); ++i) {
-            Vec4f vec = vec4f_vec3f(rotated_vertices[i], 1.0f);
-            translated_vertices[i] = mat4f_mulv(translate, vec).xyz;
-        }
-        
         // Project
         for(int i = 0; i < ARRAY_LEN(vertices); ++i) {
-            projected_vertices[i] = project(translated_vertices[i]);
+            projected_vertices[i] = project(translated_vertices[i], aspect);
         }
 
         // Screen Coordinates
@@ -409,6 +407,13 @@ int main() {
             Vec2i a = screen_vertices[i*3+0];
             Vec2i b = screen_vertices[i*3+1];
             Vec2i c = screen_vertices[i*3+2];
+            
+            // Back Face Culling
+            Vec2i ab = {b.x - a.x, b.y - a.y};
+            Vec2i ac = {c.x - a.x, c.y - a.y};
+            int cross = ab.x * ac.y - ab.y * ac.x;
+            if (cross <= 0) continue;
+
             float za = translated_vertices[i*3+0].z;
             float zb = translated_vertices[i*3+1].z;
             float zc = translated_vertices[i*3+2].z;
@@ -417,7 +422,7 @@ int main() {
         RGFW_window_blitSurface(win, surface);
 
         clock_t now = clock();
-        double delta_time = now - prev_time;
+        delta_time = now - prev_time;
         prev_time = now;
 
         int to_sleep = 1000000.0/target_fps - (delta_time*1000000 / CLOCKS_PER_SEC);
