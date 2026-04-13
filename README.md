@@ -10,3 +10,5 @@ Make sure to enable optimization for inlining to take place.
 
 On other Display Managers use have to link to the appropriate libraries. (For Wayland or Windows/MacOS etc)
 Make sure you use optimization as we are using some `inline` functions.
+
+[Some features I am working on right now.](TODO.md)
